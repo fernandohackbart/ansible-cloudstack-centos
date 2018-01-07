@@ -53,5 +53,4 @@ ansible-playbook -i hosts cloudstack-centos7.yml
 
 ## CloudStack console
 
-http://192.168.40.91:8080/client
-
+http://192.168.40.91:8080/client (admin/password)
