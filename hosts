@@ -1,0 +1,7 @@
+all:
+  vars:
+    cs_master_hostname: "192.168.40.91"
+  children:
+    csmasters:
+      hosts:
+        192.168.40.91:

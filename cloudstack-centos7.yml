@@ -1,0 +1,6 @@
+---
+- name: "Install Apache Cloudstack masters"
+  hosts: csmasters
+  remote_user: root
+  roles:
+    - cs-master

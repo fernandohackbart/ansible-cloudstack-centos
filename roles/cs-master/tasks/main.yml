@@ -1,0 +1,129 @@
+---   
+# http://docs.cloudstack.apache.org/projects/cloudstack-installation/en/4.9/management-server/index.html
+- name: Create /etc/yum.repos.d/cloudstack.repo
+  copy:
+    src: cloudstack.repo
+    dest: /etc/yum.repos.d/cloudstack.repo
+    
+- name: Install http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+  yum:
+    name: http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    state: present
+
+- name: Install http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm
+  yum:
+    name: http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm
+    state: present
+
+#- name: Install epel-release
+#  package:
+#    name: epel-release
+#    state: latest  
+
+- name: Install cloudstack-management
+  package:
+    name: cloudstack-management
+    state: latest
+    
+- name: Install mysql-server
+  package:
+    name: mysql-server
+    state: latest
+
+- name: Install expect
+  package:
+    name: expect
+    state: latest
+    
+#yum -y update
+#reboot
+
+- name: /etc/cloudstack/management/commons-logging.properties -> /etc/cloudstack/management/logging.properties
+  file:
+    src: /etc/cloudstack/management/commons-logging.properties
+    dest: /etc/cloudstack/management/logging.properties
+    state: link
+
+- name: Create /etc/my.cnf
+  copy:
+    src: my.cnf
+    dest: /etc/my.cnf 
+
+- name: Start MySQL
+  systemd:
+    enabled: yes
+    state: started
+    name: mysql
+    
+- name: Secure MySQL installation
+  shell: |
+    set timeout 300
+    spawn mysql_secure_installation
+    expect "Enter current password for root (enter for none):" { send \r }
+    expect "Set root password? [Y/n] " { send Y\r }
+    expect "New password: " { send {{ cs_master_password }}\r }
+    expect "Re-enter new password: " { send {{ cs_master_password }}\r }
+    expect "Remove anonymous users? [Y/n] " { send Y\r }
+    expect "Disallow root login remotely? [Y/n] " { send Y\r }
+    expect "Remove test database and access to it? [Y/n] " { send Y\r }
+    expect "Reload privilege tables now? [Y/n] " { send Y\r }
+    expect eof    
+#    interact
+  args:
+    executable: /usr/bin/expect
+    
+- name: Run cloudstack-setup-databases 
+  shell: "cloudstack-setup-databases cloud:{{ cs_master_password }}@localhost --deploy-as=root:{{ cs_master_password }} -m {{ cs_master_password }} -k {{ cs_master_password }}"
+
+#cat >> /etc/sudoers <<EOF
+#Defaults:cloud !requiretty
+#EOF
+
+- name: Run cloudstack-setup-management --tomcat7 
+  shell: "cloudstack-setup-management --tomcat7"
+    
+- name: Install nfs-utils
+  package:
+    name: nfs-utils
+    state: latest
+
+- name: /export/primary
+  file: 
+    path: /export/primary
+    state: directory  
+
+- name: /export/secondary
+  file: 
+    path: /export/secondary
+    state: directory  
+
+- name: Create /etc/exports
+  copy:
+    src: exports
+    dest: /etc/exports
+
+- name: Run exportfs -a
+  shell: "exportfs -a"
+
+- name: Create /etc/sysconfig/nfs
+  copy:
+    src: sysconfig-nfs
+    dest: /etc/sysconfig/nfs
+  
+- name: Create /etc/idmapd.conf
+  copy:
+    src: idmapd.conf
+    dest: /etc/idmapd.conf
+
+- name: Start rpcbind
+  systemd:
+    enabled: yes
+    state: started
+    name: rpcbind
+    
+- name: Start nfs
+  systemd:
+    enabled: yes
+    state: started
+    name: nfs
+    
