@@ -1,39 +1,39 @@
 ---   
-# http://docs.cloudstack.apache.org/projects/cloudstack-installation/en/4.9/management-server/index.html
-#- name: Create /etc/yum.repos.d/cloudstack.repo
-#  copy:
-#    src: cloudstack.repo
-#    dest: /etc/yum.repos.d/cloudstack.repo
+ http://docs.cloudstack.apache.org/projects/cloudstack-installation/en/4.9/management-server/index.html
+- name: Create /etc/yum.repos.d/cloudstack.repo
+  copy:
+    src: cloudstack.repo
+    dest: /etc/yum.repos.d/cloudstack.repo
     
+- name: Install http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm
+  yum:
+    name: http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm
+    state: present
+
+- name: Install epel-release
+  package:
+    name: epel-release
+    state: latest  
+
 #- name: Install http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 #  yum:
 #    name: http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 #    state: present
 
-#- name: Install http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm
-#  yum:
-#    name: http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm
-#    state: present
-
-#- name: Install epel-release
-#  package:
-#    name: epel-release
-#    state: latest  
-
-#- name: Install cloudstack-management
-#  package:
-#    name: cloudstack-management
-#    state: latest
+- name: Install cloudstack-management
+  package:
+    name: cloudstack-management
+    state: latest
     
-#- name: Install mysql-server
-#  package:
-#    name: mysql-server
-#    state: latest
+- name: Install mysql-server
+  package:
+    name: mysql-server
+    state: latest
 
-#- name: Install expect
-#  package:
-#    name: expect
-#    state: latest
+- name: Install MySQL-python
+  package:
+    name: MySQL-python
+    state: latest
     
 #yum -y update
 #reboot
@@ -54,31 +54,24 @@
     enabled: yes
     state: started
     name: mysql
-    
-- name: Secure MySQL installation
-  shell: |
-    set timeout 300
-    spawn mysql_secure_installation
-    expect "Enter current password for root (enter for none):" { send \n\r }
-    expect "Set root password? [Y/n] " { send \r }
-    expect "New password: " { send {{ cs_master_password }}\r }
-    expect "Re-enter new password: " { send {{ cs_master_password }}\r }
-    expect "Remove anonymous users? [Y/n] " { send "Y"\r }
-    expect "Disallow root login remotely? [Y/n] " { send "Y"\r }
-    expect "Remove test database and access to it? [Y/n] " { send "Y"\r }
-    expect "Reload privilege tables now? [Y/n] " { send "Y"\r }
-    expect eof    
-#    interact
-  args:
-    executable: /usr/bin/expect
-  register: mysql_secure
 
-- debug: msg="{{ mysql_secure.stdout }}"
-
-- debug: msg="{{ mysql_secure.stderr }}"    
+- name: Set root password
+  mysql_user: name=root host={{item}} password={{cs_master_password | mandatory}} state=present
+  with_items:
+    - '::1'
+    - '127.0.0.1'
+    - 'localhost'
+  ignore_errors: yes    
     
 - name: Run cloudstack-setup-databases 
   shell: "cloudstack-setup-databases cloud:{{ cs_master_password }}@localhost --deploy-as=root:{{ cs_master_password }} -m {{ cs_master_password }} -k {{ cs_master_password }}"
+  register: cloudstack-setup-databases_output
+
+- name: Run cloudstack-setup-databases output
+  debug: msg="{{ cloudstack-setup-databases_output.stdout }}"
+
+- name: Run cloudstack-setup-databases error
+  debug: msg="{{ cloudstack-setup-databases_output.stderr }}"   
 
 #cat >> /etc/sudoers <<EOF
 #Defaults:cloud !requiretty
@@ -86,6 +79,14 @@
 
 - name: Run cloudstack-setup-management --tomcat7 
   shell: "cloudstack-setup-management --tomcat7"
+  register: cloudstack-setup-management_output
+
+- name: Run cloudstack-setup-management output
+  debug: msg="{{ cloudstack-setup-management_output.stdout }}"
+
+- name: Run cloudstack-setup-management error
+  debug: msg="{{ cloudstack-setup-management_output.stderr }}"   
+  
     
 - name: Install nfs-utils
   package:
